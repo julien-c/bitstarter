@@ -22,10 +22,12 @@ References:
 */
 
 var fs = require('fs');
+var http = require('http');
 var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var request = require('request');
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -44,8 +46,8 @@ var loadChecks = function(checksfile) {
     return JSON.parse(fs.readFileSync(checksfile));
 };
 
-var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
+var checkString = function(string, checksfile) {
+    $ = cheerio.load(string);
     var checks = loadChecks(checksfile).sort();
     var out = {};
     for(var ii in checks) {
@@ -61,14 +63,33 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+var end = function(checkJson) {
+  var outJson = JSON.stringify(checkJson, null, 4);
+  console.log(outJson);
+}
+
 if(require.main == module) {
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
-        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists))
+        .option('-u, --url <url>', 'URL', null, 'http://floating-stream-4118.herokuapp.com')
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+    
+    var string;
+    if (program.file) {
+      string = fs.readFileSync(program.file);
+      checkJson = checkString(string, program.checks);
+      end(checkJson);
+    }
+    else if (program.url) {
+      request(program.url, function(error, response, body) {
+        // console.log('Got remote file');
+        checkJson = checkString(body, program.checks);
+        end(checkJson);
+      });
+    }
+    
+    
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
